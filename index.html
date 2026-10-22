@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Punjab Crowns</title>
+<style>
+:root{--bg:#e8edf0;--panel:#fff;--ink:#14232b;--mute:#5b6c75;--line:#c5d0d6;--btn:#14232b;--btnt:#fff;--sea:#d7e1e6;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0e171c;--panel:#16232a;--ink:#e6eef1;--mute:#8ba0aa;--line:#2b3d46;--btn:#e6eef1;--btnt:#0e171c;--sea:#1b2c35}}
+:root[data-theme="dark"]{--bg:#0e171c;--panel:#16232a;--ink:#e6eef1;--mute:#8ba0aa;--line:#2b3d46;--btn:#e6eef1;--btnt:#0e171c;--sea:#1b2c35}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif}
+h1{font:700 21px Georgia,"Times New Roman",serif;margin:0 0 4px}
+.wrap{display:flex;gap:12px;padding:12px;max-width:1250px;margin:auto;flex-wrap:wrap}
+.map{flex:1 1 460px;min-width:0}
+canvas{width:100%;height:auto;display:block;background:var(--sea);border:1px solid var(--line);border-radius:6px;cursor:pointer}
+.side{flex:1 1 300px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.box{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:8px 11px}
+.row{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.nr{display:flex;justify-content:space-between;gap:6px;align-items:center;padding:3px 0;border-bottom:1px solid var(--line);flex-wrap:wrap}
+button,select{font:inherit;border-radius:4px;padding:4px 9px;cursor:pointer}
+button{background:var(--btn);color:var(--btnt);border:0}
+button.alt,select{background:transparent;color:var(--ink);border:1px solid var(--line)}
+button.on{outline:2px solid var(--ink);outline-offset:1px}
+button:disabled{opacity:.4;cursor:default}
+button:focus-visible,select:focus-visible{outline:2px solid #2a7fff;outline-offset:2px}
+.stat{font-size:12.5px;color:var(--mute)}.stat b{color:var(--ink);font-size:15px}
+#log{height:130px;overflow:auto;font-size:12.5px;color:var(--mute)}#log div{padding:2px 0;border-bottom:1px solid var(--line)}
+.sw{display:inline-block;width:11px;height:11px;border-radius:2px;margin-right:5px}
+</style>
+</head>
+<body>
+<div class="wrap">
+ <div class="map"><canvas id="c" width="640" height="664" aria-label="Map of Punjab districts"></canvas></div>
+ <div class="side">
+  <div class="box"><h1>Punjab Crowns</h1>
+   <div class="row"><label class="stat" for="me">Play as</label><select id="me"></select><button class="alt" id="new">Restart</button></div></div>
+  <div class="box" id="top"></div>
+  <div class="box"><div class="row" id="speed"></div></div>
+  <div class="box" id="sel"></div>
+  <div class="box"><div class="stat">Diplomacy (war costs 10 political power)</div><div id="nat"></div></div>
+  <div class="box"><div id="log" aria-live="polite"></div></div>
+ </div>
+</div>
+<script>
+const NAT=[["Rawalpindi","#e8908a"],["Sargodha","#2fa58f"],["Gujranwala","#8b6be0"],["Gujrat","#6f8fb8"],["Lahore","#b28dc9"],["Faisalabad","#7fbf6a"],["D.G. Khan","#b5946a"],["Sahiwal","#e0a73c"],["Multan","#4f9bd9"],["Bahawalpur","#3d7a3a"],["Rebels","#6d6d6d"]];
+const D=[["Murree",850,45,0,2],["Attock",620,120,0,3],["Rawalpindi",790,150,0,6],["Chakwal",730,235,0,3],["Jhelum",850,225,0,3],["Talagang",590,250,0,2],
+["Mianwali",450,265,1,3],["Khushab",590,360,1,3],["Sargodha",700,400,1,4],["Bhakkar",440,500,1,3],
+["Gujrat",960,270,3,4],["M. Bahauddin",850,330,3,3],["Wazirabad",960,360,3,3],["Hafizabad",860,420,3,3],
+["Sialkot",1070,340,2,5],["Narowal",1150,390,2,3],["Gujranwala",990,410,2,5],
+["Sheikhupura",980,480,4,4],["Nankana",930,545,4,3],["Lahore",1035,535,4,8],["Qasur",990,610,4,3],
+["Chiniot",730,490,5,3],["Jhang",590,600,5,4],["Faisalabad",810,590,5,7],["Toba T. Singh",665,655,5,3],
+["Taunsa",265,640,6,2],["Layyah",400,630,6,3],["Kot Addu",370,735,6,2],["D.G. Khan",210,810,6,3],["Muzaffargarh",340,880,6,3],["Rajanpur",170,1000,6,2],
+["Sahiwal",740,725,7,4],["Okara",900,680,7,4],["Pakpattan",810,780,7,3],
+["Khanewal",570,745,8,3],["Multan",440,830,8,6],["Vehari",640,830,8,3],["Lodhran",490,910,8,3],
+["Bahawalnagar",780,950,9,3],["Bahawalpur",480,1060,9,5],["Rahim Yar Khan",260,1150,9,5]];
+const POLY=[[830,20],[870,0],[1000,10],[1050,120],[1100,260],[1250,360],[1100,470],[1090,600],[990,700],[950,770],[840,850],[700,960],[520,1100],[380,1270],[110,1160],[20,1130],[90,1000],[60,900],[210,720],[220,570],[330,520],[330,470],[380,400],[380,230],[430,175],[500,200],[530,110],[620,50],[740,50],[790,70]];
+const GW=160,GH=166,S=4,NAMES=["Rahim","Sultan","Bahadur","Zafar","Nadir","Kamran","Haider","Salim","Murad","Farid"],TR=["Martial","Diplomat","Steward"];
+const cv=document.getElementById("c"),ctx=cv.getContext("2d"),$=id=>document.getElementById(id);
+function inPoly(x,y){let c=false;for(let i=0,j=POLY.length-1;i<POLY.length;j=i++){const a=POLY[i],b=POLY[j];if((a[1]>y)!=(b[1]>y)&&x<(b[0]-a[0])*(y-a[1])/(b[1]-a[1])+a[0])c=!c}return c}
+// terrain (built once)
+const grid=new Uint8Array(GW*GH).fill(255),CX=D.map(d=>0),CY=D.map(d=>0),CN=D.map(d=>0);
+for(let j=0;j<GH;j++)for(let i=0;i<GW;i++){const x=(i+.5)*8,y=(j+.5)*8;if(!inPoly(x,y))continue;
+ let b=0,bd=1e9;D.forEach((d,k)=>{const q=(d[1]-x)**2+(d[2]-y)**2;if(q<bd){bd=q;b=k}});
+ grid[j*GW+i]=b;CX[b]+=(i+.5)*S;CY[b]+=(j+.5)*S;CN[b]++}
+D.forEach((d,k)=>{if(CN[k]){CX[k]/=CN[k];CY[k]/=CN[k]}else{CX[k]=d[1]/2;CY[k]=d[2]/2}});
+const adj=D.map(()=>new Set());
+for(let j=0;j<GH;j++)for(let i=0;i<GW;i++){const a=grid[j*GW+i];if(a==255)continue;
+ if(i<GW-1){const b=grid[j*GW+i+1];if(b!=255&&a!=b){adj[a].add(b);adj[b].add(a)}}
+ if(j<GH-1){const b=grid[(j+1)*GW+i];if(b!=255&&a!=b){adj[a].add(b);adj[b].add(a)}}}
+// state
+let P,rel,truce,legit,K,pp,gold,day,sel,timer,over,me,offer,dead,speed;
+const own=o=>P.reduce((a,p,k)=>p.o==o?a.concat(k):a,[]);
+const tt=o=>P.reduce((s,p)=>s+(p.o==o?p.t:0),0);
+const sup=p=>6+p.inc*2;
+const inc=o=>Math.round(own(o).reduce((s,k)=>s+P[k].inc*(.6+legit[o]/250)*(1-P[k].tn/200),0)*(K[o].tr=="Steward"?1.2:1));
+const cl=(v,a,b)=>Math.max(a,Math.min(b,v));
+function setRel(a,b,v,t){rel[a][b]=rel[b][a]=v;if(t)truce[a][b]=truce[b][a]=t}
+function log(m,show){if(!show)return;const d=document.createElement("div");d.textContent=m;$("log").prepend(d)}
+function init(){
+ me=+$("me").value;day=0;sel=null;over=false;pp=20;gold=60;offer=[];dead=[];
+ const mk=()=>Array.from({length:11},()=>Array(11).fill(0));rel=mk();truce=mk();
+ legit=Array.from({length:11},()=>55+Math.floor(Math.random()*20));
+ const nm=NAMES.slice().sort(()=>Math.random()-.5);
+ K=NAT.map((n,i)=>({name:nm[i%10],tr:TR[Math.floor(Math.random()*3)]}));
+ P=D.map(d=>({n:d[0],o:d[3],core:d[3],t:3+Math.floor(Math.random()*3),inc:d[4],tn:10+Math.floor(Math.random()*15)}));
+ $("log").innerHTML="";
+ log("King "+K[me].name+" takes the throne of "+NAT[me][0]+". Click your province, then a neighbour. Declare war before attacking.",1);
+ setSpeed(1);draw();ui();
+}
+function draw(){
+ ctx.clearRect(0,0,640,664);
+ const tg=new Set();if(sel!=null&&P[sel].o==me)adj[sel].forEach(k=>{if(P[k].o!=me)tg.add(k)});
+ for(let j=0;j<GH;j++)for(let i=0;i<GW;i++){const k=grid[j*GW+i];if(k==255)continue;
+  ctx.fillStyle=NAT[P[k].o][1];ctx.fillRect(i*S,j*S,S,S);
+  if(k==sel||tg.has(k)){ctx.fillStyle="rgba(255,255,255,.4)";ctx.fillRect(i*S,j*S,S,S)}}
+ for(let j=0;j<GH;j++)for(let i=0;i<GW;i++){const k=grid[j*GW+i];if(k==255)continue;
+  [[1,0],[0,1]].forEach(([dx,dy])=>{const x=i+dx,y=j+dy;const n=x<GW&&y<GH?grid[y*GW+x]:255;if(n==k)return;
+   ctx.fillStyle=n==255||P[n].o!=P[k].o?"rgba(0,0,0,.85)":"rgba(0,0,0,.25)";ctx.fillRect(i*S,j*S,S,S)})}
+ ctx.textAlign="center";ctx.textBaseline="middle";ctx.shadowColor="#000";ctx.shadowBlur=3;ctx.fillStyle="#fff";
+ P.forEach((p,k)=>{const x=CX[k],y=CY[k];
+  ctx.font="9px system-ui,sans-serif";ctx.fillText(p.n,x,y-8);
+  ctx.font="bold 13px system-ui,sans-serif";ctx.fillText(p.t,x,y+4);
+  if(p.tn>=40){ctx.fillStyle=p.tn>=70?"#ff4b3a":"#ffb02e";ctx.fillRect(x+9,y-1,6,6);ctx.fillStyle="#fff"}
+  if(p.o==me){ctx.shadowBlur=0;ctx.strokeStyle="#fff";ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(x,y+4,10,0,7);ctx.stroke();ctx.shadowBlur=3}});
+ ctx.shadowBlur=0;
+}
+function ui(){
+ const L=own(me),k=K[me];
+ $("top").innerHTML=`<div><b>King ${k.name}</b> of ${NAT[me][0]} <span class="stat">(${k.tr})</span></div>
+ <div class="row"><span class="stat">Legitimacy <b>${Math.round(legit[me])}</b></span><span class="stat">Gold <b>${gold}</b> (+${inc(me)}/mo)</span><span class="stat">Political power <b>${pp}</b></span></div>
+ <div class="stat">Month ${Math.floor(day/30)+1}, day ${day%30+1} · ${L.length} provinces · ${tt(me)} troops</div>`;
+ let h="";
+ for(let n=0;n<11;n++){if(n==me)continue;const c=own(n).length;if(!c)continue;
+  const r=rel[me][n],tr=truce[me][n],st=n==10?"hostile":r==1?"at war":r==2?"allied":tr?"truce "+tr+"m":"peace";let b="";
+  if(n<10){if(offer[n]&&r==1)b+=`<button onclick="dip(${n},'accept')">Accept peace</button>`;
+   if(r==0)b+=`<button class="alt" onclick="dip(${n},'war')">War</button><button class="alt" onclick="dip(${n},'ally')">Ally</button>`;
+   if(r==1)b+=`<button class="alt" onclick="dip(${n},'peace')">Offer peace</button>`;
+   if(r==2)b+=`<button class="alt" onclick="dip(${n},'break')">Break</button>`}
+  h+=`<div class="nr"><span><span class="sw" style="background:${NAT[n][1]}"></span>${NAT[n][0]} <span class="stat">${c}p · ${tt(n)}t · ${st}${n<10?" · K."+K[n].name+" "+Math.round(legit[n]):""}</span></span><span class="row">${b}</span></div>`}
+ $("nat").innerHTML=h;
+ const s=$("sel");
+ if(sel==null)s.innerHTML='<span class="stat">Select a province. Click an adjacent enemy to attack (half your troops go). Click an adjacent province of your own to move half your troops. Red/orange squares mark regional tension.</span>';
+ else{const p=P[sel],occ=p.core!=p.o&&p.o!=10;
+  s.innerHTML=`<div><b>${p.n}</b> · ${NAT[p.o][0]}${occ?" (occupied)":""}</div>
+  <div class="stat">Troops ${p.t}/${sup(p)} supply · Income ${p.inc} · Tension <b>${Math.round(p.tn)}</b>/100</div>
+  <div class="stat">${p.t>sup(p)?"Over supply: troops starve each month. ":""}${occ?"Occupation drains troops and raises tension. ":""}</div>`+
+  (p.o==me?`<div class="row" style="margin-top:5px"><button onclick="recruit()" ${gold<20?"disabled":""}>Recruit 5 (20 gold)</button><button onclick="appease()" ${pp<20?"disabled":""}>Appease (20 PP)</button></div>`:"")}
+}
+function recruit(){if(sel==null||P[sel].o!=me||gold<20)return;gold-=20;P[sel].t+=5;log("Recruited 5 troops in "+P[sel].n+".",1);draw();ui()}
+function appease(){if(sel==null||P[sel].o!=me||pp<20)return;pp-=20;P[sel].tn=Math.max(0,P[sel].tn-30);log("You appeased "+P[sel].n+": tension -30.",1);draw();ui()}
+function dip(n,a){
+ const s=tt(me),e=tt(n),kp=K[me].tr=="Diplomat"?.15:0;
+ if(a=="war"){if(truce[me][n]>0)return log("Truce holds for "+truce[me][n]+" more months.",1);
+  if(pp<10)return log("Declaring war costs 10 political power.",1);
+  pp-=10;setRel(me,n,1);legit[me]=Math.max(0,legit[me]-5);log("You declared war on "+NAT[n][0]+".",1)}
+ else if(a=="peace"||a=="accept"){
+  if(a=="accept"||Math.random()<cl(.5+(s-e)/(s+e+1)*.8+kp,.05,.95)){setRel(me,n,0,12);offer[n]=false;log("Peace with "+NAT[n][0]+". 12-month truce.",1)}
+  else log(NAT[n][0]+" refuses peace.",1)}
+ else if(a=="ally"){if(pp<10)return log("An alliance costs 10 political power.",1);pp-=10;
+  if(Math.random()<.35+kp+(s>e?.1:0)){setRel(me,n,2);log("Alliance with "+NAT[n][0]+".",1)}else log(NAT[n][0]+" declines the alliance.",1)}
+ else if(a=="break"){setRel(me,n,0);legit[me]=Math.max(0,legit[me]-5);log("You broke the alliance with "+NAT[n][0]+".",1)}
+ draw();ui();
+}
+function attack(a,b){
+ const A=P[a],B=P[b],f=Math.floor(A.t/2);if(f<1)return log("Not enough troops to attack.",1);
+ A.t-=f;const at=f*(K[A.o].tr=="Martial"?1.15:1),de=B.t*1.15,pv=B.o,vis=A.o==me||pv==me;
+ if(at>de){B.o=A.o;B.t=Math.max(1,Math.round(f-B.t*.8));B.tn=B.core==A.o?20:Math.max(B.tn,45);legit[A.o]=Math.min(100,legit[A.o]+3);
+  log(NAT[A.o][0]+" took "+B.n+" from "+NAT[pv][0]+".",vis)}
+ else{B.t=Math.max(1,Math.round(B.t-f*.7));log(NAT[A.o][0]+" failed to take "+B.n+".",vis)}
+}
+function nbNat(a){const s=new Set();own(a).forEach(k=>adj[k].forEach(m=>s.add(P[m].o)));s.delete(a);return[...s]}
+function monthly(){
+ gold+=inc(me);pp+=2+Math.floor(own(me).length/8);
+ for(let o=0;o<10;o++){const L=own(o);if(!L.length)continue;
+  const war=rel[o].some(v=>v==1),avg=L.reduce((s,k)=>s+P[k].tn,0)/L.length;
+  legit[o]=cl(legit[o]+(avg<30?1:avg>50?-1.5:0),0,100);
+  L.forEach(k=>{const p=P[k],occ=p.core!=o;
+   if(p.t>sup(p))p.t-=Math.ceil((p.t-sup(p))*.2);else if(!occ&&p.t<sup(p))p.t++;
+   if(occ&&p.t>2)p.t--;
+   if(war&&p.t>2&&Math.random()<.25)p.t--;
+   p.tn=cl(p.tn+(occ?3:0)+(war?1:0)+(legit[o]<40?2:0)-(p.t>=5?2:0)-1,0,100);
+   if(p.tn>=100){p.o=10;p.t=Math.floor(p.t/2)+3;p.tn=30;log(p.n+" rebels against "+NAT[o][0]+"!",o==me)}})}
+ for(let a=0;a<10;a++)for(let b=0;b<10;b++)if(truce[a][b]>0)truce[a][b]--;
+ for(let a=0;a<10;a++){if(a==me)continue;const L=own(a);if(!L.length)continue;
+  P[L[0|Math.random()*L.length]].t+=1+Math.floor(inc(a)/6);
+  for(let b=0;b<10;b++)if(rel[a][b]==1&&Math.random()<.12){
+   if(b==me){offer[a]=true;log(NAT[a][0]+" offers peace.",1)}else{setRel(a,b,0,12);log(NAT[a][0]+" and "+NAT[b][0]+" make peace.",1)}}
+  if(Math.random()<.08){const nb=nbNat(a).filter(b=>b<10&&rel[a][b]==0&&!truce[a][b]&&tt(b)<tt(a)*1.1);
+   if(nb.length){const b=nb[0|Math.random()*nb.length];setRel(a,b,1);legit[a]=Math.max(0,legit[a]-5);log(NAT[a][0]+" declares war on "+NAT[b][0]+"!",1)}}
+  for(let n=0;n<2;n++){let best=null,bs=0;
+   own(a).forEach(k=>{if(P[k].t<6)return;adj[k].forEach(m=>{const ow=P[m].o;if(ow==a||(ow!=10&&rel[a][ow]!=1))return;
+    const sc=P[k].t/2-P[m].t*1.15+Math.random();if(sc>bs){bs=sc;best=[k,m]}})});
+   if(best&&Math.random()<.6)attack(best[0],best[1])}}
+ if(Math.random()<.15){const L=own(me);if(L.length){const p=P[L[0|Math.random()*L.length]],r=Math.random();
+  if(r<.3){p.t=Math.max(1,p.t-3);log("Plague in "+p.n+": 3 troops lost.",1)}
+  else if(r<.6){gold+=25;log("A trade caravan brings 25 gold.",1)}
+  else if(r<.8){legit[me]=Math.max(0,legit[me]-8);log("Court intrigue shakes the throne: legitimacy -8.",1)}
+  else{p.tn=Math.min(99,p.tn+20);log("Unrest spreads in "+p.n+": tension +20.",1)}}}
+ check();
+}
+function check(){
+ for(let o=0;o<10;o++)if(!dead[o]&&!own(o).length){dead[o]=true;for(let b=0;b<11;b++){rel[o][b]=rel[b][o]=0}log(NAT[o][0]+" has fallen.",1)}
+ if(!own(me).length){over=true;setSpeed(0);log("Your kingdom has fallen. Game over.",1)}
+ else if(own(me).length==P.length){over=true;setSpeed(0);log("All of Punjab is yours. Victory!",1)}
+}
+function setSpeed(n){speed=n;clearInterval(timer);
+ if(n>0)timer=setInterval(()=>{day++;if(day%30==0){monthly();draw()}ui()},[0,700,300,100][n]);
+ const sp=$("speed");sp.innerHTML="";
+ [["Pause",0],["1x",1],["2x",2],["3x",3]].forEach(([l,v])=>{const b=document.createElement("button");
+  b.textContent=l;b.className="alt"+(speed==v?" on":"");b.onclick=()=>{if(!over)setSpeed(v)};sp.appendChild(b)});
+}
+cv.addEventListener("click",e=>{
+ if(over)return;const r=cv.getBoundingClientRect(),x=Math.floor((e.clientX-r.left)/r.width*GW),y=Math.floor((e.clientY-r.top)/r.height*GH);
+ const k=grid[Math.min(GH-1,y)*GW+Math.min(GW-1,x)];if(k==255)return;const o=P[k].o;
+ if(sel!=null&&P[sel].o==me&&sel!=k&&adj[sel].has(k)){
+  if(o==me){const f=Math.floor(P[sel].t/2);if(f>=1){P[sel].t-=f;P[k].t+=f;log("Moved "+f+" troops to "+P[k].n+".",1)}}
+  else if(o!=10&&rel[me][o]==2)log("You cannot attack an ally.",1);
+  else if(o!=10&&rel[me][o]!=1)log("Declare war on "+NAT[o][0]+" first.",1);
+  else{attack(sel,k);check()}
+ }else sel=sel==k?null:k;
+ draw();ui();
+});
+NAT.slice(0,10).forEach((n,i)=>{const o=document.createElement("option");o.value=i;o.textContent=n[0];$("me").appendChild(o)});
+$("me").value=4;$("me").onchange=init;$("new").onclick=init;
+init();
+</script>
+</body>
+</html>
